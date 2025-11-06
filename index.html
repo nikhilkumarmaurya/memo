@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NikMemo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        'primary-dark': '#1e293b', // Slate-800
+                        'secondary-dark': '#334155', // Slate-700
+                        'accent-blue': '#3b82f6', // Blue-500
+                        'text-light': '#f8fafc', // Slate-50
+                        'border-subtle': '#475569', // Slate-600
+                        'pinned-yellow': '#facc15', // Amber-400
+                        'checked-green': '#10b981', // Emerald-500
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom scrollbar for a sleek dark theme */
+        .notes-container::-webkit-scrollbar, .modal-content-area::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .notes-container::-webkit-scrollbar-track, .modal-content-area::-webkit-scrollbar-track {
+            background: #1e293b; 
+        }
+
+        .notes-container::-webkit-scrollbar-thumb, .modal-content-area::-webkit-scrollbar-thumb {
+            background: #475569; 
+            border-radius: 4px;
+        }
+
+        .notes-container::-webkit-scrollbar-thumb:hover, .modal-content-area::-webkit-scrollbar-thumb:hover {
+            background: #64748b; 
+        }
+
+        /* Basic animation utility for Framer Motion logic equivalent */
+        .note-card {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        
+        /* Auto-Resize Textarea Styling */
+        #note-content-input {
+            min-height: 12rem; 
+            resize: none; 
+            overflow-y: hidden; 
+        }
+
+        /* Checkbox customization in modal */
+        .checklist-item input[type="checkbox"]:checked + label {
+            color: #475569; /* Slate-600 */
+            text-decoration: line-through;
+            transition: all 0.2s ease;
+        }
+
+        .checklist-item input[type="checkbox"] {
+            width: 1.25rem;
+            height: 1.25rem;
+            accent-color: #3b82f6; /* Accent blue */
+        }
+    </style>
+</head>
+
+<body class="dark bg-gray-900 text-text-light transition-colors duration-500 min-h-screen">
+
+    <div class="container mx-auto p-4 md:p-8">
+
+        <header class="mb-8">
+            <h1 class="text-4xl font-extrabold text-accent-blue tracking-tight mb-2">
+                
+            </h1>
+            <p class="text-gray-400"></p>
+
+            <div class="flex flex-col md:flex-row gap-4 mt-6">
+                <div class="relative flex-grow">
+                    <input type="text" id="search-input" placeholder="Search notes by title or content..."
+                        class="w-full bg-secondary-dark text-text-light border border-border-subtle rounded-xl py-3 pl-10 pr-4 focus:ring-accent-blue focus:border-accent-blue transition duration-300 shadow-lg"
+                        aria-label="Search Notes">
+                    <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                </div>
+                
+                <div class="relative">
+                    <select id="category-filter-select" aria-label="Filter Notes by Category"
+                        class="appearance-none w-full bg-secondary-dark text-text-light border border-border-subtle rounded-xl py-3 pl-4 pr-8 focus:ring-accent-blue focus:border-accent-blue transition duration-300 shadow-lg cursor-pointer">
+                        <option value="">All Notes</option>
+                        <option value="Pinned">🌟 Pinned</option>
+                        </select>
+                    <i class="fas fa-filter absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none"></i>
+                </div>
+
+                <div class="flex space-x-3 w-full md:w-auto">
+                    <button id="add-note-btn" aria-label="Add New Note"
+                        class="w-1/2 p-3 bg-accent-blue hover:bg-blue-600 text-white rounded-xl transition duration-300 shadow-lg active:scale-95 transform flex items-center justify-center">
+                        <i class="fas fa-plus"></i>
+                        <span class="ml-2">New Note</span>
+                    </button>
+                    <button id="add-checklist-btn" aria-label="Add New Checklist"
+                        class="w-1/2 p-3 bg-secondary-dark hover:bg-slate-600 text-gray-300 rounded-xl transition duration-300 shadow-lg active:scale-95 transform flex items-center justify-center">
+                        <i class="fas fa-list-check"></i>
+                        <span class="ml-2">Checklist</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <div id="new-note-form" class="bg-primary-dark p-6 rounded-xl shadow-2xl mb-8 transform scale-95 opacity-0 transition-all duration-300 hidden">
+            <h3 class="text-xl font-semibold mb-4 text-accent-blue">Create New Note</h3>
+            
+            <div class="relative mb-3">
+                <input list="category-datalist" id="category-input" placeholder="Select or type new category..."
+                       class="w-full bg-secondary-dark text-text-light border border-border-subtle rounded-lg p-3 focus:ring-accent-blue focus:border-accent-blue transition duration-300"
+                       aria-label="Note Category Input">
+                <datalist id="category-datalist">
+                    </datalist>
+            </div>
+            
+            <input type="text" id="note-title-input" placeholder="Note Title (e.g., Project Ideas)"
+                class="w-full bg-secondary-dark text-text-light border border-border-subtle rounded-lg p-3 mb-3 focus:ring-accent-blue focus:border-accent-blue transition duration-300"
+                aria-label="Note Title Input">
+            
+            <textarea id="note-content-input" placeholder="Note Content (Type here, each new line can be a checklist item...)" 
+                class="w-full bg-secondary-dark text-text-light border border-border-subtle rounded-lg p-3 mb-4 focus:ring-accent-blue focus:border-accent-blue transition duration-300"
+                aria-label="Note Content Input"></textarea>
+            
+            <div class="flex justify-end space-x-3">
+                <button id="cancel-note-btn"
+                    class="py-2 px-4 bg-gray-600 hover:bg-gray-700 text-text-light rounded-lg transition duration-300 active:scale-95 transform">
+                    Cancel
+                </button>
+                <button id="save-note-btn"
+                    class="py-2 px-4 bg-accent-blue hover:bg-blue-600 text-white rounded-lg transition duration-300 active:scale-95 transform">
+                    Save Note
+                </button>
+            </div>
+        </div>
+
+        <div id="notes-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 notes-container">
+            </div>
+
+        <div id="empty-state" class="text-center p-12 bg-primary-dark rounded-xl shadow-xl mt-8 transition-opacity duration-500">
+            <i class="fas fa-clipboard text-6xl text-gray-600 mb-4"></i>
+            <h2 class="text-2xl font-semibold text-gray-300 mb-2">Your Notes Are Empty</h2>
+            <p class="text-gray-400">Click the **+ New Note** button to get started.</p>
+        </div>
+    </div>
+    
+    <div id="content-modal" class="fixed inset-0 z-50 hidden bg-gray-900 bg-opacity-80 flex items-center justify-center p-4" aria-modal="true" role="dialog" aria-labelledby="modal-title">
+        <div id="modal-content-wrapper" class="bg-secondary-dark w-full max-w-2xl lg:max-w-4xl max-h-[90vh] rounded-xl shadow-2xl transform scale-90 opacity-0 transition-all duration-300">
+            <div class="p-6">
+                <div class="flex justify-between items-center pb-4 border-b border-border-subtle">
+                    <h3 id="modal-title" class="text-2xl font-bold text-accent-blue truncate">Full Note Content</h3>
+                    <button id="close-modal-btn" aria-label="Close Note View"
+                        class="p-2 text-gray-400 hover:text-text-light transition duration-300 rounded-full active:scale-90 transform">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+
+                <div class="py-4 overflow-y-auto modal-content-area max-h-[70vh]">
+                    <ul id="modal-checklist" class="space-y-3"></ul>
+                    <p id="modal-content-plain" class="whitespace-pre-wrap text-lg text-gray-300 leading-relaxed hidden"></p>
+                </div>
+                
+                <input type="hidden" id="modal-note-id"> 
+            </div>
+        </div>
+    </div>
+
+    <div id="toast-notification" aria-live="polite"
+        class="fixed bottom-5 left-1/2 transform -translate-x-1/2 bg-green-600 text-white py-2 px-4 rounded-full shadow-2xl opacity-0 transition-opacity duration-300 hidden z-50">
+        <i class="fas fa-check-circle mr-2"></i> Action Complete!
+    </div>
+
+    <script>
+        // Global utility for UUID generation
+        const generateUUID = () => crypto.randomUUID();
+
+        // Helper function to safely encode HTML entities
+        const escapeHtml = (unsafe) => {
+            if (typeof unsafe !== 'string') return '';
+            return unsafe.replace(/&/g, "&amp;")
+                        .replace(/</g, "&lt;")
+                        .replace(/>/g, "&gt;")
+                        .replace(/"/g, "&quot;")
+                        .replace(/'/g, "&#039;");
+        };
+
+        // --- Persistent Storage and Data Management ---
+        const loadNotes = () => {
+            try {
+                const notes = localStorage.getItem('proNotesApp_data');
+                return notes ? JSON.parse(notes) : [];
+            } catch (error) {
+                console.error("Error loading notes from localStorage:", error);
+                return []; 
+            }
+        };
+
+        const loadCategories = () => {
+            try {
+                const categories = localStorage.getItem('proNotesApp_categories');
+                return categories ? Array.from(JSON.parse(categories)) : [];
+            } catch (error) {
+                console.error("Error loading categories from localStorage:", error);
+                return [];
+            }
+        };
+
+        const saveNotes = (notes) => {
+            try {
+                localStorage.setItem('proNotesApp_data', JSON.stringify(notes));
+                updateEmptyState();
+            } catch (error) {
+                console.error("Error saving notes to localStorage:", error);
+            }
+        };
+        
+        const saveCategories = (categories) => {
+            try {
+                const uniqueCategories = Array.from(new Set(categories)).sort();
+                localStorage.setItem('proNotesApp_categories', JSON.stringify(uniqueCategories));
+                populateCategoryFilter(uniqueCategories);
+                populateCategoryDatalist(uniqueCategories);
+                return uniqueCategories;
+            } catch (error) {
+                console.error("Error saving categories to localStorage:", error);
+                return categories;
+            }
+        };
+
+        let notes = loadNotes();
+        let categories = saveCategories(loadCategories());
+
+        // --- DOM Elements and Utilities ---
+
+        const notesListEl = document.getElementById('notes-list');
+        const newNoteFormEl = document.getElementById('new-note-form');
+        const emptyStateEl = document.getElementById('empty-state');
+        const toastEl = document.getElementById('toast-notification');
+        const contentModalEl = document.getElementById('content-modal');
+        const modalContentWrapperEl = document.getElementById('modal-content-wrapper');
+        const modalChecklistEl = document.getElementById('modal-checklist');
+        const modalPlainContentEl = document.getElementById('modal-content-plain');
+        const modalNoteIdInput = document.getElementById('modal-note-id');
+
+        const categoryInput = document.getElementById('category-input');
+        const categoryDatalistEl = document.getElementById('category-datalist');
+        const categoryFilterSelectEl = document.getElementById('category-filter-select');
+        const noteTitleInput = document.getElementById('note-title-input');
+        const noteContentInput = document.getElementById('note-content-input');
+        const saveNoteBtn = document.getElementById('save-note-btn');
+        const searchInput = document.getElementById('search-input');
+        
+        let isEditing = false;
+        let editingId = null;
+
+        // --- Core UI Functions ---
+
+        /** Populates the category filter dropdown and datalist with unique categories. */
+        const populateCategoryFilter = (uniqueCategories) => {
+            categoryFilterSelectEl.innerHTML = '<option value="">All Notes</option><option value="Pinned">🌟 Pinned</option>';
+            
+            uniqueCategories.forEach(cat => {
+                const option = document.createElement('option');
+                option.value = cat;
+                option.textContent = cat;
+                categoryFilterSelectEl.appendChild(option);
+            });
+
+            categoryDatalistEl.innerHTML = '';
+            uniqueCategories.forEach(cat => {
+                const option = document.createElement('option');
+                option.value = cat;
+                categoryDatalistEl.appendChild(option);
+            });
+        };
+
+        /** Dynamically adjusts the height of the textarea based on its content. */
+        const autoResizeTextarea = (textarea) => {
+            textarea.style.height = 'auto'; 
+            textarea.style.height = (textarea.scrollHeight) + 'px';
+            
+            const minHeightPx = 12 * 16; 
+            if (textarea.scrollHeight < minHeightPx) {
+                textarea.style.height = minHeightPx + 'px';
+            }
+        };
+
+        /** Updates the visibility of the empty state message. */
+        const updateEmptyState = () => {
+            const hasNotes = notes.length > 0;
+            emptyStateEl.classList.toggle('hidden', hasNotes);
+            emptyStateEl.classList.toggle('flex', !hasNotes);
+        };
+        
+        /** Shows a toast notification. */
+        const showToast = (message) => {
+            toastEl.textContent = message;
+            toastEl.classList.remove('hidden');
+            // Ensure toast is visible by bringing it to front
+            toastEl.style.zIndex = 100; 
+            gsap.fromTo(toastEl, { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.3, ease: "power2.out" });
+
+            setTimeout(() => {
+                gsap.to(toastEl, { opacity: 0, y: 10, duration: 0.3, ease: "power2.in", onComplete: () => {
+                    toastEl.classList.add('hidden');
+                    toastEl.style.zIndex = 50;
+                }});
+            }, 3000);
+        };
+        
+        // --- Note CRUD Operations (Made Global for HTML onClick/ondblclick) ---
+        
+        /** Copies a note's content to the clipboard. */
+        window.copyNoteContent = (id) => {
+            const note = notes.find(n => n.id === id);
+            if (!note) return;
+
+            // Use the modern Clipboard API
+            navigator.clipboard.writeText(note.content).then(() => {
+                showToast("Content copied to clipboard!");
+            }).catch(err => {
+                console.error('Could not copy text: ', err);
+                showToast("Failed to copy content!");
+            });
+        };
+
+
+        /** Deletes a note by its ID on DBLCLICK. */
+        window.deleteNote = (id) => {
+            const noteCard = document.getElementById(`note-${id}`);
+            if (noteCard) {
+                gsap.to(noteCard, { 
+                    opacity: 0, 
+                    scale: 0.7, 
+                    duration: 0.2, 
+                    onComplete: () => {
+                        notes = notes.filter(n => n.id !== id);
+                        saveNotes(notes);
+                        renderNotes(searchInput.value, categoryFilterSelectEl.value);
+                        showToast("Note deleted!");
+                    }
+                });
+            }
+        };
+
+        /** Enters edit mode for a note on DBLCLICK. */
+        window.editNote = (id) => {
+            const note = notes.find(n => n.id === id);
+            if (!note) return;
+            toggleNewNoteForm(true, note);
+        };
+
+        /** Toggles the pinned state of a note. */
+        window.togglePin = (id) => {
+            const note = notes.find(n => n.id === id);
+            if (note) {
+                note.pinned = !note.pinned;
+                saveNotes(notes);
+                renderNotes(searchInput.value, categoryFilterSelectEl.value); 
+                showToast(note.pinned ? "Note Pinned! 📌" : "Note Unpinned!");
+            }
+        };
+        
+        /** Creates or updates a note. */
+        const handleSaveNote = () => {
+            // Note: Content is saved as raw text.
+            const category = categoryInput.value.trim() || 'Uncategorized';
+            const title = noteTitleInput.value.trim();
+            const content = noteContentInput.value; 
+
+            if (!title && !content) {
+                showToast("Note cannot be empty!");
+                return;
+            }
+            
+            if (!categories.includes(category) && category !== 'Uncategorized') {
+                categories.push(category);
+                categories = saveCategories(categories);
+            }
+
+            if (isEditing) {
+                const noteIndex = notes.findIndex(n => n.id === editingId);
+                if (noteIndex !== -1) {
+                    notes[noteIndex].category = category;
+                    notes[noteIndex].title = title;
+                    notes[noteIndex].content = content;
+                    notes[noteIndex].updatedAt = new Date().toISOString();
+                }
+                showToast("Note updated successfully!");
+                isEditing = false;
+                editingId = null;
+            } else {
+                const newNote = {
+                    id: generateUUID(),
+                    category: category,
+                    title: title || "Untitled Note",
+                    content: content,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    pinned: false,
+                };
+                notes.unshift(newNote);
+                showToast("Note saved successfully!");
+            }
+
+            saveNotes(notes);
+            renderNotes(searchInput.value, categoryFilterSelectEl.value); 
+            
+            categoryInput.value = '';
+            noteTitleInput.value = '';
+            noteContentInput.value = '';
+            noteContentInput.style.height = '12rem'; 
+            toggleNewNoteForm(false);
+        };
+        
+        /** Toggles the visibility of the new note form with animation. */
+        const toggleNewNoteForm = (show, note = null) => {
+            if (show) {
+                newNoteFormEl.classList.remove('hidden');
+                gsap.to(newNoteFormEl, { 
+                    opacity: 1, 
+                    scale: 1, 
+                    duration: 0.3, 
+                    ease: "back.out(1.7)",
+                    onStart: () => categoryInput.focus()
+                });
+            } else {
+                gsap.to(newNoteFormEl, { 
+                    opacity: 0, 
+                    scale: 0.95, 
+                    duration: 0.3, 
+                    ease: "power2.in",
+                    onComplete: () => newNoteFormEl.classList.add('hidden')
+                });
+                isEditing = false;
+                editingId = null;
+                saveNoteBtn.textContent = 'Save Note';
+            }
+            
+            if (note) {
+                categoryInput.value = note.category;
+                noteTitleInput.value = note.title;
+                noteContentInput.value = note.content; // Load raw content for editing
+                saveNoteBtn.textContent = 'Update Note';
+                isEditing = true;
+                editingId = note.id;
+                setTimeout(() => autoResizeTextarea(noteContentInput), 50); 
+            } else {
+                noteContentInput.style.height = '12rem'; 
+            }
+        };
+
+        // --- Checklist / Modal Functions ---
+
+        /** Updates the content of a note based on the modal checklist interaction. */
+        const updateNoteContentFromChecklist = (id, checklistItems) => {
+            const noteIndex = notes.findIndex(n => n.id === id);
+            if (noteIndex === -1) return;
+
+            // Reconstruct the content from checklist items
+            const newContent = checklistItems.map(item => {
+                const isChecked = item.querySelector('input[type="checkbox"]').checked;
+                // We use textContent here for safety
+                const text = item.querySelector('label').textContent.trim();
+                // Format: [x] Checked Item or [ ] Unchecked Item
+                return (isChecked ? '[x] ' : '[ ] ') + text;
+            }).join('\n'); // Join by newline
+
+            notes[noteIndex].content = newContent;
+            notes[noteIndex].updatedAt = new Date().toISOString();
+            saveNotes(notes);
+            // Re-render the note card if it's visible to update the summary
+            renderNotes(searchInput.value, categoryFilterSelectEl.value);
+        };
+
+        /** Handles checkbox state change inside the modal. */
+        const handleChecklistChange = (e) => {
+            if (e.target.type === 'checkbox') {
+                const noteId = modalNoteIdInput.value;
+                const checklistItems = Array.from(modalChecklistEl.querySelectorAll('li'));
+                updateNoteContentFromChecklist(noteId, checklistItems);
+            }
+        };
+
+        /** Displays the full content of a note in a Modal (as text or checklist). */
+        window.showFullContent = (id) => {
+            const note = notes.find(n => n.id === id);
+            if (!note) return;
+
+            document.getElementById('modal-title').textContent = note.title;
+            modalNoteIdInput.value = note.id;
+            modalChecklistEl.innerHTML = '';
+            modalPlainContentEl.textContent = ''; // Ensure modal content is set as TEXT
+            
+            const isChecklist = note.content.split('\n').some(line => 
+                line.trim().startsWith('[ ]') || line.trim().startsWith('[x]')
+            );
+
+            if (isChecklist) {
+                modalChecklistEl.classList.remove('hidden');
+                modalPlainContentEl.classList.add('hidden');
+                
+                const checklistHTML = note.content.split('\n')
+                    .filter(line => line.trim()) // Filter out empty lines
+                    .map(line => {
+                        const trimmedLine = line.trim();
+                        const isChecked = trimmedLine.startsWith('[x]');
+                        const text = trimmedLine.replace(/^\[[x\s]\]\s*/, '');
+                        
+                        // Use a consistent ID for the label/input for accessibility
+                        const itemID = `item-${generateUUID()}`; 
+
+                        return `
+                            <li class="checklist-item flex items-start space-x-3 text-lg">
+                                <input type="checkbox" id="${itemID}" ${isChecked ? 'checked' : ''} class="mt-1">
+                                <label for="${itemID}" class="flex-1 ${isChecked ? 'line-through text-gray-500' : 'text-gray-300'}">
+                                    ${escapeHtml(text)}
+                                </label>
+                            </li>
+                        `;
+                    }).join('');
+                
+                modalChecklistEl.innerHTML = checklistHTML;
+                modalChecklistEl.removeEventListener('change', handleChecklistChange); 
+                modalChecklistEl.addEventListener('change', handleChecklistChange);
+
+            } else {
+                modalChecklistEl.classList.add('hidden');
+                modalPlainContentEl.classList.remove('hidden');
+                // Set textContent directly to prevent HTML execution
+                modalPlainContentEl.textContent = note.content || "No content available.";
+            }
+
+            // Show modal with animation
+            contentModalEl.classList.remove('hidden');
+            gsap.fromTo(contentModalEl, { opacity: 0 }, { opacity: 1, duration: 0.3 });
+            gsap.fromTo(modalContentWrapperEl, 
+                { opacity: 0, scale: 0.9 }, 
+                { opacity: 1, scale: 1, duration: 0.3, ease: "back.out(1.7)" }
+            );
+        };
+
+        /** Hides the full content modal. */
+        const hideFullContent = () => {
+            gsap.to(modalContentWrapperEl, 
+                { opacity: 0, scale: 0.9, duration: 0.2, ease: "power2.in" }
+            );
+            gsap.to(contentModalEl, { 
+                opacity: 0, 
+                duration: 0.3, 
+                onComplete: () => contentModalEl.classList.add('hidden') 
+            });
+        };
+        
+        // --- Rendering Logic ---
+
+        /** Renders the notes to the DOM, applying search/filter and sorting (Pinned first). */
+        const renderNotes = (query = '', categoryFilter = '') => {
+            const lowerQuery = query.toLowerCase();
+            let filteredNotes = notes.filter(note => 
+                note.title.toLowerCase().includes(lowerQuery) || 
+                note.content.toLowerCase().includes(lowerQuery)
+            );
+
+            if (categoryFilter === 'Pinned') {
+                filteredNotes = filteredNotes.filter(note => note.pinned);
+            } else if (categoryFilter) {
+                filteredNotes = filteredNotes.filter(note => note.category === categoryFilter);
+            }
+
+            filteredNotes.sort((a, b) => {
+                if (a.pinned && !b.pinned) return -1;
+                if (!a.pinned && b.pinned) return 1;
+                return new Date(b.updatedAt) - new Date(a.updatedAt);
+            });
+
+            notesListEl.innerHTML = filteredNotes.map(createNoteCard).join('');
+            
+            gsap.fromTo(".note-card", 
+                { opacity: 0, y: 20 }, 
+                { opacity: 1, y: 0, duration: 0.5, stagger: 0.05, ease: "power2.out" }
+            );
+
+            emptyStateEl.classList.toggle('hidden', filteredNotes.length > 0);
+            emptyStateEl.classList.toggle('flex', filteredNotes.length === 0);
+        };
+        
+        /** Creates the HTML structure for a single note card. */
+        const createNoteCard = (note) => {
+            const date = new Date(note.updatedAt).toLocaleDateString('en-US', {
+                year: 'numeric', month: 'short', day: 'numeric'
+            });
+            const pinnedClass = note.pinned ? 'text-pinned-yellow' : 'text-gray-500 hover:text-pinned-yellow';
+            const pinnedBorder = note.pinned ? 'border-l-4 border-pinned-yellow/80 shadow-yellow-500/10' : 'border-l-4 border-primary-dark/0';
+
+            const isChecklist = note.content.split('\n').some(line => 
+                line.trim().startsWith('[ ]') || line.trim().startsWith('[x]')
+            );
+
+            let contentPreview = note.content || 'No content added...';
+            if (isChecklist) {
+                const lines = note.content.split('\n').filter(line => line.trim());
+                const totalTasks = lines.length;
+                const completedTasks = lines.filter(line => line.trim().startsWith('[x]')).length;
+                
+                // Show a brief preview of the tasks themselves
+                const firstTask = lines.length > 0 ? lines[0].replace(/^\[[x\s]\]\s*/, '').substring(0, 30) : 'No tasks.';
+
+                contentPreview = `✅ ${completedTasks}/${totalTasks} tasks. (${firstTask}${lines.length > 1 ? '...' : ''})`;
+            }
+            
+            // Note content is escaped for display in the card preview to prevent XSS
+            const safePreview = escapeHtml(contentPreview); 
+            
+            return `
+                <div id="note-${note.id}" class="note-card bg-primary-dark p-6 rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300 border border-border-subtle hover:border-accent-blue/50 transform hover:-translate-y-1 ${pinnedBorder}" data-id="${note.id}" role="listitem">
+                    <div class="flex justify-between items-start mb-3">
+                        <h3 class="text-xl font-bold text-text-light truncate pr-4" title="${note.title}">${note.title}</h3>
+                        <button onclick="togglePin('${note.id}')" aria-label="${note.pinned ? 'Unpin Note' : 'Pin Note'}"
+                                class="w-8 h-8 flex items-center justify-center rounded-full transition-colors duration-200 ${pinnedClass} active:scale-90 transform"
+                                title="${note.pinned ? 'Unpin Note' : 'Pin Note'}">
+                            <i class="fas fa-thumbtack"></i>
+                        </button>
+                    </div>
+
+                    <span class="inline-block bg-accent-blue/20 text-accent-blue text-xs font-semibold px-2 py-1 rounded-full mb-3">${note.category}</span>
+                    
+                    <p onclick="showFullContent('${note.id}')" class="text-gray-400 mb-4 overflow-hidden max-h-24 leading-relaxed cursor-pointer hover:text-gray-300 transition-colors duration-200 line-clamp-4" title="Click to read full note / manage checklist">
+                        ${safePreview}
+                    </p>
+                    
+                    <div class="flex justify-between items-center border-t border-border-subtle pt-3 mt-3">
+                        <span class="text-sm text-gray-500">Updated: ${date}</span>
+                        <div class="flex space-x-2">
+                            <button onclick="copyNoteContent('${note.id}')" aria-label="Copy Note Content"
+                                class="w-8 h-8 flex items-center justify-center bg-green-800/30 hover:bg-green-800/50 text-green-400 rounded-lg transition duration-300 active:scale-90 transform"
+                                title="Copy Content">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                            <button ondblclick="editNote('${note.id}')" aria-label="Edit Note (Double Click)"
+                                class="w-8 h-8 flex items-center justify-center bg-secondary-dark hover:bg-slate-600 text-gray-300 rounded-lg transition duration-300 active:scale-90 transform"
+                                title="Double Click to Edit Note">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button ondblclick="deleteNote('${note.id}')" aria-label="Delete Note (Double Click)"
+                                class="w-8 h-8 flex items-center justify-center bg-red-800/30 hover:bg-red-800/50 text-red-400 rounded-lg transition duration-300 active:scale-90 transform"
+                                title="Double Click to Delete Note">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        };
+
+
+        // --- Event Listeners ---
+        
+        // Auto-Resize on input
+        noteContentInput.addEventListener('input', (e) => autoResizeTextarea(e.target));
+        
+        // New Note Button (Standard empty note)
+        document.getElementById('add-note-btn').addEventListener('click', () => {
+             toggleNewNoteForm(true);
+             noteTitleInput.value = '';
+             categoryInput.value = '';
+        });
+
+        // New Checklist Button (Blank structured checklist)
+        document.getElementById('add-checklist-btn').addEventListener('click', () => {
+            toggleNewNoteForm(true);
+            noteTitleInput.value = 'New To-Do List';
+            // Provide a starting structure for the user to fill immediately
+            noteContentInput.value = '[ ] '; 
+            autoResizeTextarea(noteContentInput);
+            categoryInput.value = 'To-Do'; 
+        });
+
+        // Cancel Note Button
+        document.getElementById('cancel-note-btn').addEventListener('click', () => toggleNewNoteForm(false));
+
+        // Save/Update Note Button
+        saveNoteBtn.addEventListener('click', handleSaveNote);
+
+        // Search Input
+        searchInput.addEventListener('input', (e) => renderNotes(e.target.value, categoryFilterSelectEl.value));
+        
+        // Category Filter Dropdown
+        categoryFilterSelectEl.addEventListener('change', (e) => renderNotes(searchInput.value, e.target.value));
+        
+        // Close Modal Button
+        document.getElementById('close-modal-btn').addEventListener('click', hideFullContent);
+        
+        // Close Modal by clicking backdrop
+        contentModalEl.addEventListener('click', (e) => {
+            if (e.target === contentModalEl) {
+                hideFullContent();
+            }
+        });
+
+        // --- Initialization ---
+
+        document.addEventListener('DOMContentLoaded', () => {
+            populateCategoryFilter(categories);
+            renderNotes();
+            autoResizeTextarea(noteContentInput); 
+        });
+    </script>
+</body>
+</html>
